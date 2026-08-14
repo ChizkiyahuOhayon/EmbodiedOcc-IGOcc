@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+*.so
+*.o
+
+# Training outputs
+workdir/
+*.log
+
+# Checkpoints (kept on NAS, symlinked in)
+checkpoints/*.pt
+checkpoints/*.pth
+
+# Big data (symlinked to NAS) — keep the split *.txt tracked
+data/occscannet/posed_images
+data/occscannet/gathered_data
+data/occscannet/depthanything
+data/occscannet/normals
+data/occscannet/kappas
+data/scene_occ/global_occ_package
+data/scene_occ/streme_occ_new_package
+*.tar
+*.tar.gz
+*.zip
+
+# Vendored sub-repos (cloned separately per REPRODUCE)
+Depth-Anything-V2/
+EfficientNet-PyTorch/
+surface_normal_uncertainty/
