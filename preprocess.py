@@ -1,3 +1,8 @@
+import os, sys
+# surface_normal_uncertainty's NNET.py uses bare `from models...` / `import utils`
+# imports, so its repo root must be on sys.path (insert first so its models/utils/data
+# packages resolve; names don't clash with EmbodiedOcc2's `model`/`dataset`).
+sys.path.insert(0, os.path.join(os.getcwd(), 'surface_normal_uncertainty'))
 import torch
 import numpy as np
 from torch import nn
