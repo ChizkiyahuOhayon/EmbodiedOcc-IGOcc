@@ -36,6 +36,14 @@ we can compare cost (a stated contribution — we remove ++'s 3× MC-dropout).
   (16200-pt `for` + `.item()`, ×3 refine/forward). GPU util only 9-18%.
   → At 4.7s/iter FULL repro is infeasible; must vectorize the forward first
   (already on the PR roadmap; doubles as speedup + our contribution). Profiling with py-spy.
+- **py-spy confirmed hotspot** = get_kappa_guided_weight / get_projected_normals in
+  mono_refine_layer.py (two inner `for n in range(16200)` with .item()/int(), GIL-bound).
+  Secondary: SyncBatchNorm all_reduce + EfficientNet-B7 forward.
+- **FIX (2026-08-18): vectorized both GRM loops** (advanced indexing + clamp, numerically
+  equivalent). Wall-clock **4.7s → 1.25s/iter = 3.7x faster**; loss unchanged/healthy on
+  resumed run (equivalence holds). Residual gap (1.25s wall vs 0.15s compute) likely
+  SyncBN sync — next optimization target if needed. TODO: same vectorization for the
+  embodied stage's online_refine_layer (loops + MC-dropout) before FULL embodied repro.
 
 ## Per-run entries (older)
 
