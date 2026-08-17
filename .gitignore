@@ -29,3 +29,6 @@ data/scene_occ/streme_occ_new_package
 Depth-Anything-V2/
 EfficientNet-PyTorch/
 surface_normal_uncertainty/
+
+# local SSD cache of mini working set (speeds up dataloading off NAS)
+data_local/
