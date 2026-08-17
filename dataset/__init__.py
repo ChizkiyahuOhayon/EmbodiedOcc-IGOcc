@@ -44,19 +44,35 @@ def build_dataloader(
         train_sampler = DistributedSampler(train_wrapper, shuffle=True, drop_last=True)
         val_sampler = DistributedSampler(val_wrapper, shuffle=False, drop_last=False)
 
+    # Optional loader-perf knobs (default off -> identical to original behaviour).
+    # persistent_workers avoids re-spawning workers every epoch; prefetch_factor
+    # deepens the prefetch buffer to hide per-item CPU/IO latency. Guarded so they
+    # only apply when num_workers > 0.
+    def _extra(loader_config):
+        nw = loader_config["num_workers"]
+        e = {}
+        if nw > 0:
+            if loader_config.get("persistent_workers", False):
+                e["persistent_workers"] = True
+            if "prefetch_factor" in loader_config:
+                e["prefetch_factor"] = loader_config["prefetch_factor"]
+        return e
+
     train_dataset_loader = DataLoader(dataset=train_wrapper,
                                     batch_size=train_loader_config["batch_size"],
                                     collate_fn=custom_collate_fn,
                                     shuffle=False if dist else train_loader_config["shuffle"],
                                     sampler=train_sampler,
                                     num_workers=train_loader_config["num_workers"],
-                                    pin_memory=True)
+                                    pin_memory=True,
+                                    **_extra(train_loader_config))
     val_dataset_loader = DataLoader(dataset=val_wrapper,
                                     batch_size=val_loader_config["batch_size"],
                                     collate_fn=custom_collate_fn,
                                     shuffle=False if dist else val_loader_config["shuffle"],
                                     sampler=val_sampler,
                                     num_workers=val_loader_config["num_workers"],
-                                    pin_memory=True)
+                                    pin_memory=True,
+                                    **_extra(val_loader_config))
 
     return train_dataset_loader, val_dataset_loader
