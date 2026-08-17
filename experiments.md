@@ -23,6 +23,22 @@ we can compare cost (a stated contribution — we remove ++'s 3× MC-dropout).
 
 ## Per-run entries (newest first)
 
+### [2026-08-18] mono-mini-local-smoke — validate full pipeline on 80-scene mini
+- Config: train_mono_mini_geo_local_config.py | GPUs: 3 (0,1,2) | batch 1 → eff. batch 3
+- Data: local SSD cache (data_local/occscannet), 503GB RAM page cache
+- **Pipeline VALIDATED end-to-end** (data→model→CUDA ops→train→eval→ckpt).
+- Epoch 1 eval: geo IoU = 0.267, sem mIoU = 0.149
+  per-class IoU [0.941,0.000,0.297,0.229,0.148,0.159,0.069,0.218,0.170,0.000,0.165,0.184]
+  (epoch-1 numbers, expected to climb over 20 epochs; not the final baseline)
+- **Speed finding:** ~4.7s/iter and did NOT improve on epoch 2 (page cache warm) →
+  bottleneck is COMPUTE, not I/O. Local cache gave 11→4.7s (2.3× — that part was I/O).
+  Residual = Python-heavy forward, suspected GRM per-Gaussian loop in mono_refine_layer
+  (16200-pt `for` + `.item()`, ×3 refine/forward). GPU util only 9-18%.
+  → At 4.7s/iter FULL repro is infeasible; must vectorize the forward first
+  (already on the PR roadmap; doubles as speedup + our contribution). Profiling with py-spy.
+
+## Per-run entries (older)
+
 ### Template (copy for each run)
 ```
 ### [YYYY-MM-DD] <exp-id> — <one-line goal>
