@@ -83,7 +83,12 @@ NEVER paste long code into the SSH terminal — it truncates ~50 lines. Ship via
   `~/.cache/torch/hub/rwightman_gen-efficientnet-pytorch_master` + run with proxy.
 - `model_true.pth` (depthbranch.py:26) is DEAD CODE (GaussianDepthBranch never instantiated) — ignore.
 - `Depth-Anything-V2/.../dpt.py` `infer_image` MUST be patched to the 4-arg version or depth
-  preprocess fails with "takes 2 to 3 positional arguments but 5 were given".
+  preprocess fails with "takes 2 to 3 positional arguments but 5 were given". (Applied 2026-08-17.)
+- pytorch3d: install the prebuilt wheel `py38_cu113_pyt1121` (v0.7.2). Do NOT use `--no-index`
+  (it hides deps → "No matching distribution for fvcore"). Instead: `pip install fvcore iopath`
+  first, then `pip install --no-deps ... pytorch3d -f <fbaipublicfiles wheel url>` (proxy on).
+- `find data/occscannet/<dir>` reports 0 files because those dirs are symlinks to NAS and find
+  doesn't follow the top-level symlink — use `find -L` or `ls dir/*/*`. Data is really there.
 
 ## 8. Reproduce commands (see REPRODUCE_EMBODIEDOCC2.md for full)
 ```bash

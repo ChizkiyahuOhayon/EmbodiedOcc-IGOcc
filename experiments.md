@@ -42,9 +42,9 @@ we can compare cost (a stated contribution — we remove ++'s 3× MC-dropout).
 - [x] 2026-08-13 datasets downloaded to NAS (occscannet, scene_occ, depth ckpt)
 - [x] 2026-08-14 data extracted; scannet.pt (291MB) obtained; git workflow live
 - [x] 2026-08-14 preprocess.py import + torch.hub cache fixed
-- [ ] dpt.py infer_image edit applied (depth preprocess)
-- [ ] MINI normals/kappas/depthanything generated (80 scenes)
-- [ ] pytorch3d installed; CUDA ops built
-- [ ] PR0 MINI reproduce (mono → embodied)
+- [x] 2026-08-17 dpt.py infer_image edit applied (depth preprocess)
+- [x] 2026-08-17 MINI normals/kappas/depthanything generated (80 scenes; 7311 npy each, consistent, no NaN)
+- [x] 2026-08-17 pytorch3d 0.7.2 (py38_cu113_pyt1121 wheel + fvcore/iopath) installed; CUDA ops built (local-aggregate, deformable-aggregation-ext)
+- [ ] PR0 MINI reproduce (mono → embodied)  <-- IN PROGRESS: mono_mini_geo on GPU0-2
 - [ ] FULL preprocess (681 scenes)
 - [ ] PR0 FULL reproduce → baseline row 0d filled
