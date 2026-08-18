@@ -323,28 +323,26 @@ class OnlineRefineLayer(BaseModule):
             point_normals: [B, N, 3] normal directions for each point
         """
         B, N = xyz_logits.shape[:2]
+        H, W = normals.shape[-2:]
         point_normals = []
-        
+
         for b in range(B):
-            # Project to pixel coordinates
+            # Project to pixel coordinates (already vectorized over all N points)
             pixel_coords, valid_mask = self.project_points_to_image(
-                xyz_logits[b], 
+                xyz_logits[b],
                 metas
             )  # [N, 2], [N]
-            
-            # Get normals
-            batch_normals = []
-            for n in range(N):
-                if valid_mask[n]:
-                    x = int(pixel_coords[n, 0])
-                    y = int(pixel_coords[n, 1])
-                    normal = normals[b, :, y, x]
-                else:
-                    normal = torch.zeros(3, device=xyz_logits.device)
-                batch_normals.append(normal)
-                
-            point_normals.append(torch.stack(batch_normals))
-            
+
+            # Vectorized pixel lookup, numerically identical to the original per-point
+            # loop (valid -> normals[:, y, x]; invalid -> zeros(3)). int() truncation
+            # becomes .long(); clamp keeps invalid points' indices in-bounds since they
+            # are zeroed out right after.
+            x = pixel_coords[:, 0].long().clamp(0, W - 1)
+            y = pixel_coords[:, 1].long().clamp(0, H - 1)
+            normal = normals[b, :, y, x].transpose(0, 1)  # [N, 3]
+            normal = normal * valid_mask.unsqueeze(-1).to(normal.dtype)
+            point_normals.append(normal)
+
         return torch.stack(point_normals)  # [B, N, 3]
 
     def apply_normal_constraint(self, delta_xyz, normals, weights=None, valid_mask=None):
@@ -399,39 +397,31 @@ class OnlineRefineLayer(BaseModule):
             weights: [B, N] normal_weight for each point
         """
         B, N = xyz_logits.shape[:2]
+        H, W = kappa_map.shape[-2:]
         point_weights = []
-        
+
         for b in range(B):
-            # Project to pixel coordinates
+            # Project to pixel coordinates (already vectorized over all N points)
             pixel_coords, valid_mask = self.project_points_to_image(
-                xyz_logits[b], 
+                xyz_logits[b],
                 metas
             )  # [N, 2], [N]
-            
-            # Get kappa value for each point
-            batch_weights = []
-            for n in range(N):
-                if valid_mask[n]:
-                    x = int(pixel_coords[n, 0])
-                    y = int(pixel_coords[n, 1])
-                    kappa_value = kappa_map[b, 0, y, x].item()
-                    
-                    # Compute normal_weight based on kappa
-                    if kappa_value <= self.kappa_threshold_low:
-                        weight = self.min_normal_weight
-                    elif kappa_value >= self.kappa_threshold_high:
-                        weight = self.max_normal_weight
-                    else:
-                        # Linear interpolation
-                        ratio = (kappa_value - self.kappa_threshold_low) / (self.kappa_threshold_high - self.kappa_threshold_low)
-                        weight = self.min_normal_weight + ratio * (self.max_normal_weight - self.min_normal_weight)
-                else:
-                    weight = self.min_normal_weight  # Use min weight for invalid points
-                    
-                batch_weights.append(weight)
-                
-            point_weights.append(torch.tensor(batch_weights, device=xyz_logits.device))
-            
+
+            # Vectorized kappa lookup + piecewise-linear weight, numerically identical to
+            # the original per-point loop:
+            #   kappa <= low  -> min_normal_weight   (ratio clamps to 0)
+            #   kappa >= high -> max_normal_weight   (ratio clamps to 1)
+            #   otherwise linear; invalid points   -> min_normal_weight.
+            x = pixel_coords[:, 0].long().clamp(0, W - 1)
+            y = pixel_coords[:, 1].long().clamp(0, H - 1)
+            kappa_values = kappa_map[b, 0, y, x]  # [N]
+            ratio = ((kappa_values - self.kappa_threshold_low) /
+                     (self.kappa_threshold_high - self.kappa_threshold_low)).clamp(0.0, 1.0)
+            weight = self.min_normal_weight + ratio * (self.max_normal_weight - self.min_normal_weight)
+            weight = torch.where(valid_mask, weight,
+                                 torch.full_like(weight, float(self.min_normal_weight)))
+            point_weights.append(weight)
+
         return torch.stack(point_weights)  # [B, N]
     
     def get_fused_normal_weights(self, xyz_logits, kappa_map, metas, point_semantics=None):
