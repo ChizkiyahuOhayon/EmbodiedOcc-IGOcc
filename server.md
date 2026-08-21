@@ -90,13 +90,30 @@ NEVER paste long code into the SSH terminal — it truncates ~50 lines. Ship via
 - `find data/occscannet/<dir>` reports 0 files because those dirs are symlinks to NAS and find
   doesn't follow the top-level symlink — use `find -L` or `ls dir/*/*`. Data is really there.
 
+## 7b. TRAINING RULES (locked — violating these silently corrupts results)
+- **Never change the GPU count mid-run.** This model uses SyncBatchNorm; batch_size=1 per GPU.
+  Effective batch = nproc_per_node. Resuming a checkpoint on a different GPU count changes the
+  effective batch and the BN sync group → metrics degrade or become non-comparable.
+- **Never train this model on a SINGLE GPU with batch_size=1.** BN then computes mean/var over ONE
+  sample → running stats corrupt → model degrades every epoch. Keep effective batch >= 2 (i.e.
+  >= 2 GPUs, or grad-accum if ever single-GPU). We proved this the hard way: the first mono-mini
+  run peaked ep9 on 3 GPUs (0.502/0.396, still climbing) then fell to 0.435/0.331 after a 3->1
+  GPU switch. That result is INVALID — not a code bug, an operational error.
+- Pick a GPU count at launch and hold it for the whole run. If a GPU gets pre-empted, STOP and
+  restart from scratch (or from a checkpoint) at the SAME count — do not silently drop to fewer.
+- Always launch with an explicit `--work-dir` so runs never overwrite each other.
+
 ## 8. Reproduce commands (see REPRODUCE_EMBODIEDOCC2.md for full)
 ```bash
 # preprocess (mini) — 1 GPU
 HTTPS_PROXY=http://127.0.0.1:7890 CUDA_VISIBLE_DEVICES=0 python preprocess_subset.py --features all \
   --splits data/occscannet/train_mini_final.txt data/occscannet/test_mini_final.txt \
            data/scene_occ/train_mini_online.txt data/scene_occ/test_mini_online.txt
-# train mini: mono then embodied
-torchrun --nproc_per_node=4 train_mono.py     --py-config config/train_mono_mini_geo_config.py
-torchrun --nproc_per_node=4 train_embodied.py --py-config config/train_embodied_mini_unc_config.py
+# train mini: mono then embodied — FIXED GPU count, local-cache config, explicit work-dir.
+# (see 7b) hold the GPU count for the whole run; do NOT switch mid-run.
+CUDA_VISIBLE_DEVICES=0,1,2 torchrun --nproc_per_node=3 train_mono.py \
+  --py-config config/train_mono_mini_geo_local_config.py \
+  --work-dir out/mono_mini_3gpu_v2
+CUDA_VISIBLE_DEVICES=0,1,2 torchrun --nproc_per_node=3 train_embodied.py \
+  --py-config config/train_embodied_mini_unc_config.py --work-dir out/embodied_mini_3gpu
 ```

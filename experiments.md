@@ -44,6 +44,16 @@ we can compare cost (a stated contribution — we remove ++'s 3× MC-dropout).
   resumed run (equivalence holds). Residual gap (1.25s wall vs 0.15s compute) likely
   SyncBN sync — next optimization target if needed. TODO: same vectorization for the
   embodied stage's online_refine_layer (loops + MC-dropout) before FULL embodied repro.
+- **RESULT (ran to epoch 20) — INVALIDATED by a mid-run GPU-count switch.**
+  Curve: peaked at epoch 9 on 3 GPUs (geo 0.502 / sem 0.396, still climbing toward the
+  Local-mini target 0.557/0.482), then DEGRADED monotonically once resumed on 1 GPU
+  (ep10 0.480/0.367 → ep20 0.435/0.331). Root cause: SyncBatchNorm with single-GPU
+  batch_size=1 computes BN stats over ONE sample → corrupts running mean/var, model
+  degrades every epoch. Transition is exactly at the 3→1 GPU switch (ep9→10).
+  **NOT a code bug** (pipeline/vectorization/equivalence all valid) — an operational error.
+  **RULES (locked, see server.md): never change GPU count mid-run; never single-GPU
+  batch_size=1 for this model (BN breaks); keep GPU count fixed, effective batch >= 2.**
+  Action: re-run mono-mini from scratch on a FIXED >=2 GPU setup (new work-dir).
 
 ## Per-run entries (older)
 
