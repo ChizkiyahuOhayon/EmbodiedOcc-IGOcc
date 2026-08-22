@@ -120,6 +120,9 @@ we can compare cost (a stated contribution — we remove ++'s 3× MC-dropout).
 - [x] 2026-08-17 dpt.py infer_image edit applied (depth preprocess)
 - [x] 2026-08-17 MINI normals/kappas/depthanything generated (80 scenes; 7311 npy each, consistent, no NaN)
 - [x] 2026-08-17 pytorch3d 0.7.2 (py38_cu113_pyt1121 wheel + fvcore/iopath) installed; CUDA ops built (local-aggregate, deformable-aggregation-ext)
-- [ ] PR0 MINI reproduce (mono → embodied)  <-- IN PROGRESS: mono_mini_geo on GPU0-2
+- [x] 2026-08-23 MONO mini reproduced clean: geo 0.530 / sem 0.438 (20ep, 3×A40) — row 0a
+- [x] 2026-08-23 EMBODIED mini data verified complete (check_embodied_data.py): train 64 scenes
+      /1920 frames, test 16/480, all normals/kappas/depthany/gathered/streme/pkg present. See DATA_SPEC.md.
+- [ ] PR0 MINI reproduce (mono ✅ → embodied ⏳ train_embodied_mini_unc_local, load_from=mono ep20)
 - [ ] FULL preprocess (681 scenes)
 - [ ] PR0 FULL reproduce → baseline row 0d filled
