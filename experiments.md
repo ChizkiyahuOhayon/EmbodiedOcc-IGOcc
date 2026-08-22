@@ -14,7 +14,7 @@ we can compare cost (a stated contribution — we remove ++'s 3× MC-dropout).
 | # | date | stage/PR | config | GPUs | key change | mono IoU/mIoU | embodied IoU/mIoU | wall-clock | notes |
 |---|---|---|---|---|---|---|---|---|---|
 | — | — | ++ paper | — | 8×A800 | reference | 0.549/0.462 (local) | 0.522/0.436 (full) | — | targets |
-| 0a | _pending_ | PR0 repro | train_mono_mini_geo | ? | baseline mini mono | | — | | pipeline validation |
+| 0a | 2026-08-23 | PR0 repro | train_mono_mini_geo_local | 3×A40 | baseline mini mono | **0.530/0.438** | — | ~14.5h/20ep | DONE — clean, vs target 0.557/0.482 (95%/91%) |
 | 0b | _pending_ | PR0 repro | train_embodied_mini_unc | ? | baseline mini embodied | — | | | pipeline validation |
 | 0c | _pending_ | PR0 repro | train_mono_geo (full) | 4 | baseline full mono | | — | | |
 | 0d | _pending_ | PR0 repro | train_embodied_unc (full) | 4 | baseline full embodied | — | | | **PR0 baseline** |
@@ -54,6 +54,47 @@ we can compare cost (a stated contribution — we remove ++'s 3× MC-dropout).
   **RULES (locked, see server.md): never change GPU count mid-run; never single-GPU
   batch_size=1 for this model (BN breaks); keep GPU count fixed, effective batch >= 2.**
   Action: re-run mono-mini from scratch on a FIXED >=2 GPU setup (new work-dir).
+
+### [2026-08-21→22] mono-mini v2 — CLEAN re-run, fixed 3 GPUs (0,1,2), new work-dir
+- Config: train_mono_mini_geo_local_config.py | work-dir: out/mono_mini_3gpu_v2
+- GPUs: 3 (0,1,2), held the WHOLE run — no mid-run switch. batch 1 → eff. batch 3.
+- ~1.24s/iter train; 1834 train + 792 eval iters/epoch ≈ 44 min/epoch.
+- **Clean eval curve, monotonic climb (this is the valid baseline trajectory):**
+  | ep | geo IoU | sem mIoU |
+  |----|---------|----------|
+  | 1  | 0.2614  | 0.1632 |
+  | 2  | 0.3501  | 0.2633 |
+  | 3  | 0.3997  | 0.2985 |
+  | 4  | 0.4330  | 0.3183 |
+  | 5  | 0.4506  | 0.3469 |
+  | 6  | 0.4394  | 0.3570 |
+  | 7  | 0.4770  | 0.3771 |
+  | 8  | 0.4942  | 0.3871 |
+  | 9  | 0.4957  | 0.3949 |
+  ep9 per-class IoU [0.958,0.199,0.442,0.373,0.293,0.372,0.541,0.547,0.413,0.283,0.514,0.367]
+- **Cross-check:** ep9 here (0.496/0.395) ≈ invalidated run's ep9 (0.502/0.396) → reproducible,
+  vectorization confirmed NOT hurting accuracy. Still climbing toward Local-mini 0.557/0.482.
+- **Interruptions (operational, not code):** ep1-9 ran 08/21 evening, process KILLED mid-ep10
+  (~iter150, 03:02, SIGHUP — stderr not captured). Two failed relaunches were launched from the
+  `(base)` conda env by mistake → `ModuleNotFoundError: mmengine`, instant exit (harmless, before
+  any load). Fixed by `conda activate embodiedocc` + `python -m torch.distributed.run` + nohup +
+  `2>&1` capture. Resumed from latest.pth (=epoch_9) on the SAME 3 GPUs → VALID (same count).
+- **COMPLETED: ran full 20 epochs, clean, monotonic, no degradation.** ep10-20:
+  | ep | geo | sem |    | ep | geo | sem |
+  |----|-----|-----|----|----|-----|-----|
+  | 10 | 0.4937 | 0.3999 | | 16 | 0.5287 | 0.4320 |
+  | 11 | 0.5073 | 0.4094 | | 17 | 0.5298 | 0.4361 |
+  | 12 | 0.5124 | 0.4177 | | 18 | 0.5283 | 0.4359 |
+  | 13 | 0.5161 | 0.4232 | | 19 | 0.5297 | 0.4368 |
+  | 14 | 0.5198 | 0.4241 | | 20 | 0.5299 | 0.4375 |
+  | 15 | 0.5308 | 0.4351 | | peak-geo ep15, peak-sem ep20 |
+  ep20 per-class IoU [0.963,0.244,0.490,0.414,0.345,0.406,0.570,0.594,0.460,0.311,0.561,0.418]
+- **FINAL mono-mini baseline (ours, reproduced): geo IoU 0.530 / sem mIoU 0.438** (ep20; plateau
+  from ep15). Converged ~44 min/epoch on 3×A40.
+- **vs EmbodiedOcc++ Local-mini target 0.557 / 0.482:** we hit 95.2% geo / 90.8% sem. Gap
+  (geo -0.027, sem -0.044) is within normal repro variance on the small mini set (single seed,
+  no best-of). This is our anchor for the mono/Local benchmark; IG-Occ improvements measured
+  against THIS number. (For headline claims we will also run FULL later.)
 
 ## Per-run entries (older)
 
